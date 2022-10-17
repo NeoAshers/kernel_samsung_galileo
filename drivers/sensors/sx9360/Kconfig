@@ -1,0 +1,14 @@
+config INPUT_SX9360
+	tristate "Semtech SX9360"
+	depends on (I2C) && SYSFS
+	help
+	   This driver support the Semtech SX9360 sensor.
+	   To compile this driver as a module, choose M here. The module
+	   will be called sx9360.
+
+config INPUT_SX9360_I2C
+	bool "Use I2C interface for SX9360"
+	depends on INPUT_SX9360
+	depends on I2C
+	help
+	  Use I2C insterface for SX9360 sensor

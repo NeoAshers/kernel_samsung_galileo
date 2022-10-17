@@ -1,0 +1,7 @@
+config GNSS_SHMEM_IF
+	bool "Samsung Shared memory Interface for GNSS"
+	select MCU_IPC
+	select SHM_IPC
+	default n
+	---help---
+	  Samsung Shared Memory Interface for GNSS.

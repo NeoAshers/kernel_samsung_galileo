@@ -1,0 +1,44 @@
+#!/bin/bash +x
+
+set -e
+
+ODIN_META_CURRENT_SERVER=$1
+ODIN_META_SRC_TAR=$2
+ODIN_META_TGT_META=$3
+ODIN_META_MODEL_NAME=$4
+
+ODIN_META_BASEDIR=$(dirname "$0")
+ODIN_META_SIGN_CLIENT_JAR=$ODIN_META_BASEDIR/signclient.jar
+ODIN_META_GEN=$ODIN_META_BASEDIR/odinMetaGen
+
+if [ -z $ODIN_META_MODEL_NAME ]; then
+  echo odinMeta server source.tar target.mf model
+  exit 1
+fi
+
+ODIN_META_TMP_DIR=$(echo $ODIN_META_TGT_META | sed -e 's/\/meta\-data\/.*//g')
+if [ "$ODIN_META_TGT_META" = "$ODIN_META_TMP_DIR" ]; then
+  ODIN_META_TMP_INPUT_DATA=odin_meta.tmp
+else
+  if [ ! -e "$ODIN_META_TMP_DIR" ]; then
+    echo "Make dir : $ODIN_META_TMP_DIR"
+    mkdir -p "$ODIN_META_TMP_DIR"
+  fi
+  ODIN_META_TMP_INPUT_DATA=$ODIN_META_TMP_DIR/odin_meta.tmp
+fi
+
+rm -f $ODIN_META_TMP_INPUT_DATA
+rm -f $ODIN_META_TGT_META
+
+eval chmod a+x $ODIN_META_GEN
+eval $ODIN_META_GEN $ODIN_META_SRC_TAR $ODIN_META_TMP_INPUT_DATA $ODIN_META_MODEL_NAME
+java -jar $ODIN_META_SIGN_CLIENT_JAR -model GalaxyC -runtype ss_odinmeta -input $ODIN_META_TMP_INPUT_DATA -output $ODIN_META_TGT_META
+if [ -e $ODIN_META_TGT_META ]; then
+  cat $ODIN_META_TMP_INPUT_DATA >> $ODIN_META_TGT_META
+  rm -f $ODIN_META_TMP_INPUT_DATA
+else
+  rm -f $ODIN_META_TMP_INPUT_DATA
+  echo $ODIN_META_TGT_META is not exist
+  exit 1
+fi
+
