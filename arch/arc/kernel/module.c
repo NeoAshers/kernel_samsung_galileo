@@ -32,8 +32,8 @@ int module_frob_arch_sections(Elf_Ehdr *hdr, Elf_Shdr *sechdrs,
 #ifdef CONFIG_ARC_DW2_UNWIND
 	mod->arch.unw_sec_idx = 0;
 	mod->arch.unw_info = NULL;
-#endif
 	mod->arch.secstr = secstr;
+#endif
 	return 0;
 }
 
@@ -113,10 +113,8 @@ int apply_relocate_add(Elf32_Shdr *sechdrs,
 
 	}
 
-#ifdef CONFIG_ARC_DW2_UNWIND
 	if (strcmp(module->arch.secstr+sechdrs[tgtsec].sh_name, ".eh_frame") == 0)
 		module->arch.unw_sec_idx = tgtsec;
-#endif
 
 	return 0;
 

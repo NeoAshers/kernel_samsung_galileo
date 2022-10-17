@@ -259,10 +259,8 @@ static __init int efivar_ssdt_load(void)
 		}
 
 		data = kmalloc(size, GFP_KERNEL);
-		if (!data) {
-			ret = -ENOMEM;
+		if (!data)
 			goto free_entry;
-		}
 
 		ret = efivar_entry_get(entry, NULL, &size, data);
 		if (ret) {

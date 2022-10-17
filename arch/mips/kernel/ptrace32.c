@@ -69,7 +69,7 @@ long compat_arch_ptrace(struct task_struct *child, compat_long_t request,
 		if (get_user(addrOthers, (u32 __user * __user *) (unsigned long) addr) != 0)
 			break;
 
-		copied = ptrace_access_vm(child, (u64)addrOthers, &tmp,
+		copied = access_process_vm(child, (u64)addrOthers, &tmp,
 				sizeof(tmp), FOLL_FORCE);
 		if (copied != sizeof(tmp))
 			break;
@@ -178,7 +178,7 @@ long compat_arch_ptrace(struct task_struct *child, compat_long_t request,
 		if (get_user(addrOthers, (u32 __user * __user *) (unsigned long) addr) != 0)
 			break;
 		ret = 0;
-		if (ptrace_access_vm(child, (u64)addrOthers, &data,
+		if (access_process_vm(child, (u64)addrOthers, &data,
 					sizeof(data),
 					FOLL_FORCE | FOLL_WRITE) == sizeof(data))
 			break;

@@ -71,7 +71,8 @@ void __init efi_fake_memmap(void)
 	}
 
 	/* allocate memory for new EFI memmap */
-	new_memmap_phy = efi_memmap_alloc(new_nr_map);
+	new_memmap_phy = memblock_alloc(efi.memmap.desc_size * new_nr_map,
+					PAGE_SIZE);
 	if (!new_memmap_phy)
 		return;
 

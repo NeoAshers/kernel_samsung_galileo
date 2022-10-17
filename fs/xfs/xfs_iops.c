@@ -98,27 +98,12 @@ xfs_init_security(
 static void
 xfs_dentry_to_name(
 	struct xfs_name	*namep,
-	struct dentry	*dentry)
-{
-	namep->name = dentry->d_name.name;
-	namep->len = dentry->d_name.len;
-	namep->type = XFS_DIR3_FT_UNKNOWN;
-}
-
-static int
-xfs_dentry_mode_to_name(
-	struct xfs_name	*namep,
 	struct dentry	*dentry,
 	int		mode)
 {
 	namep->name = dentry->d_name.name;
 	namep->len = dentry->d_name.len;
-	namep->type = xfs_mode_to_ftype(mode);
-
-	if (unlikely(namep->type == XFS_DIR3_FT_UNKNOWN))
-		return -EFSCORRUPTED;
-
-	return 0;
+	namep->type = xfs_mode_to_ftype[(mode & S_IFMT) >> S_SHIFT];
 }
 
 STATIC void
@@ -134,7 +119,7 @@ xfs_cleanup_inode(
 	 * xfs_init_security we must back out.
 	 * ENOSPC can hit here, among other things.
 	 */
-	xfs_dentry_to_name(&teardown, dentry);
+	xfs_dentry_to_name(&teardown, dentry, 0);
 
 	xfs_remove(XFS_I(dir), &teardown, XFS_I(inode));
 }
@@ -169,12 +154,8 @@ xfs_generic_create(
 	if (error)
 		return error;
 
-	/* Verify mode is valid also for tmpfile case */
-	error = xfs_dentry_mode_to_name(&name, dentry, mode);
-	if (unlikely(error))
-		goto out_free_acl;
-
 	if (!tmpfile) {
+		xfs_dentry_to_name(&name, dentry, mode);
 		error = xfs_create(XFS_I(dir), &name, mode, rdev, &ip);
 	} else {
 		error = xfs_create_tmpfile(XFS_I(dir), dentry, mode, &ip);
@@ -190,12 +171,12 @@ xfs_generic_create(
 
 #ifdef CONFIG_XFS_POSIX_ACL
 	if (default_acl) {
-		error = __xfs_set_acl(inode, default_acl, ACL_TYPE_DEFAULT);
+		error = xfs_set_acl(inode, default_acl, ACL_TYPE_DEFAULT);
 		if (error)
 			goto out_cleanup_inode;
 	}
 	if (acl) {
-		error = __xfs_set_acl(inode, acl, ACL_TYPE_ACCESS);
+		error = xfs_set_acl(inode, acl, ACL_TYPE_ACCESS);
 		if (error)
 			goto out_cleanup_inode;
 	}
@@ -267,7 +248,7 @@ xfs_vn_lookup(
 	if (dentry->d_name.len >= MAXNAMELEN)
 		return ERR_PTR(-ENAMETOOLONG);
 
-	xfs_dentry_to_name(&name, dentry);
+	xfs_dentry_to_name(&name, dentry, 0);
 	error = xfs_lookup(XFS_I(dir), &name, &cip, NULL);
 	if (unlikely(error)) {
 		if (unlikely(error != -ENOENT))
@@ -294,7 +275,7 @@ xfs_vn_ci_lookup(
 	if (dentry->d_name.len >= MAXNAMELEN)
 		return ERR_PTR(-ENAMETOOLONG);
 
-	xfs_dentry_to_name(&xname, dentry);
+	xfs_dentry_to_name(&xname, dentry, 0);
 	error = xfs_lookup(XFS_I(dir), &xname, &ip, &ci_name);
 	if (unlikely(error)) {
 		if (unlikely(error != -ENOENT))
@@ -329,9 +310,7 @@ xfs_vn_link(
 	struct xfs_name	name;
 	int		error;
 
-	error = xfs_dentry_mode_to_name(&name, dentry, inode->i_mode);
-	if (unlikely(error))
-		return error;
+	xfs_dentry_to_name(&name, dentry, inode->i_mode);
 
 	error = xfs_link(XFS_I(dir), XFS_I(inode), &name);
 	if (unlikely(error))
@@ -350,7 +329,7 @@ xfs_vn_unlink(
 	struct xfs_name	name;
 	int		error;
 
-	xfs_dentry_to_name(&name, dentry);
+	xfs_dentry_to_name(&name, dentry, 0);
 
 	error = xfs_remove(XFS_I(dir), &name, XFS_I(d_inode(dentry)));
 	if (error)
@@ -380,9 +359,7 @@ xfs_vn_symlink(
 
 	mode = S_IFLNK |
 		(irix_symlink_mode ? 0777 & ~current_umask() : S_IRWXUGO);
-	error = xfs_dentry_mode_to_name(&name, dentry, mode);
-	if (unlikely(error))
-		goto out;
+	xfs_dentry_to_name(&name, dentry, mode);
 
 	error = xfs_symlink(XFS_I(dir), &name, symname, mode, &cip);
 	if (unlikely(error))
@@ -418,7 +395,6 @@ xfs_vn_rename(
 {
 	struct inode	*new_inode = d_inode(ndentry);
 	int		omode = 0;
-	int		error;
 	struct xfs_name	oname;
 	struct xfs_name	nname;
 
@@ -429,14 +405,8 @@ xfs_vn_rename(
 	if (flags & RENAME_EXCHANGE)
 		omode = d_inode(ndentry)->i_mode;
 
-	error = xfs_dentry_mode_to_name(&oname, odentry, omode);
-	if (omode && unlikely(error))
-		return error;
-
-	error = xfs_dentry_mode_to_name(&nname, ndentry,
-					d_inode(odentry)->i_mode);
-	if (unlikely(error))
-		return error;
+	xfs_dentry_to_name(&oname, odentry, omode);
+	xfs_dentry_to_name(&nname, ndentry, d_inode(odentry)->i_mode);
 
 	return xfs_rename(XFS_I(odir), &oname, XFS_I(d_inode(odentry)),
 			  XFS_I(ndir), &nname,
@@ -802,7 +772,7 @@ xfs_vn_setattr_nonsize(
  * Caution: The caller of this function is responsible for calling
  * setattr_prepare() or otherwise verifying the change is fine.
  */
-STATIC int
+int
 xfs_setattr_size(
 	struct xfs_inode	*ip,
 	struct iattr		*iattr)

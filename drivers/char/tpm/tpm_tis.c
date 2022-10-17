@@ -421,7 +421,7 @@ err_pnp:
 	acpi_bus_unregister_driver(&tis_acpi_driver);
 err_acpi:
 #endif
-	platform_driver_unregister(&tis_drv);
+	platform_device_unregister(force_pdev);
 err_platform:
 	if (force_pdev)
 		platform_device_unregister(force_pdev);

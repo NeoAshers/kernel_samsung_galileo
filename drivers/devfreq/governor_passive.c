@@ -112,11 +112,6 @@ static int update_devfreq_passive(struct devfreq *devfreq, unsigned long freq)
 	if (ret < 0)
 		goto out;
 
-	if (devfreq->profile->freq_table
-		&& (devfreq_update_status(devfreq, freq)))
-		dev_err(&devfreq->dev,
-			"Couldn't update frequency transition information.\n");
-
 	devfreq->previous_freq = freq;
 
 out:
@@ -184,7 +179,6 @@ static int devfreq_passive_event_handler(struct devfreq *devfreq,
 
 static struct devfreq_governor devfreq_passive = {
 	.name = "passive",
-	.immutable = 1,
 	.get_target_freq = devfreq_passive_get_target_freq,
 	.event_handler = devfreq_passive_event_handler,
 };

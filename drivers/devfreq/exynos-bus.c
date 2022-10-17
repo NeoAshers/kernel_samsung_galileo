@@ -498,7 +498,7 @@ passive:
 	if (IS_ERR(bus->devfreq)) {
 		dev_err(dev,
 			"failed to add devfreq dev with passive governor\n");
-		ret = PTR_ERR(bus->devfreq);
+		ret = -EPROBE_DEFER;
 		goto err;
 	}
 

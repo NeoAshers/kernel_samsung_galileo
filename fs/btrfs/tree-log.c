@@ -37,7 +37,6 @@
  */
 #define LOG_INODE_ALL 0
 #define LOG_INODE_EXISTS 1
-#define LOG_OTHER_INODE 2
 
 /*
  * directory trouble cases
@@ -1941,11 +1940,12 @@ static noinline int find_dir_range(struct btrfs_root *root,
 next:
 	/* check the next slot in the tree to see if it is a valid item */
 	nritems = btrfs_header_nritems(path->nodes[0]);
-	path->slots[0]++;
 	if (path->slots[0] >= nritems) {
 		ret = btrfs_next_leaf(root, path);
 		if (ret)
 			goto out;
+	} else {
+		path->slots[0]++;
 	}
 
 	btrfs_item_key_to_cpu(path->nodes[0], &key, path->slots[0]);
@@ -4624,7 +4624,7 @@ static int btrfs_log_inode(struct btrfs_trans_handle *trans,
 	if (S_ISDIR(inode->i_mode) ||
 	    (!test_bit(BTRFS_INODE_NEEDS_FULL_SYNC,
 		       &BTRFS_I(inode)->runtime_flags) &&
-	     inode_only >= LOG_INODE_EXISTS))
+	     inode_only == LOG_INODE_EXISTS))
 		max_key.type = BTRFS_XATTR_ITEM_KEY;
 	else
 		max_key.type = (u8)-1;
@@ -4648,13 +4648,7 @@ static int btrfs_log_inode(struct btrfs_trans_handle *trans,
 		return ret;
 	}
 
-	if (inode_only == LOG_OTHER_INODE) {
-		inode_only = LOG_INODE_EXISTS;
-		mutex_lock_nested(&BTRFS_I(inode)->log_mutex,
-				  SINGLE_DEPTH_NESTING);
-	} else {
-		mutex_lock(&BTRFS_I(inode)->log_mutex);
-	}
+	mutex_lock(&BTRFS_I(inode)->log_mutex);
 
 	/*
 	 * a brute force approach to making sure we get the most uptodate
@@ -4806,7 +4800,7 @@ again:
 				 * unpin it.
 				 */
 				err = btrfs_log_inode(trans, root, other_inode,
-						      LOG_OTHER_INODE,
+						      LOG_INODE_EXISTS,
 						      0, LLONG_MAX, ctx);
 				iput(other_inode);
 				if (err)
@@ -5211,7 +5205,6 @@ process_leaf:
 			if (di_key.type == BTRFS_ROOT_ITEM_KEY)
 				continue;
 
-			btrfs_release_path(path);
 			di_inode = btrfs_iget(root->fs_info->sb, &di_key,
 					      root, NULL);
 			if (IS_ERR(di_inode)) {
@@ -5221,12 +5214,13 @@ process_leaf:
 
 			if (btrfs_inode_in_log(di_inode, trans->transid)) {
 				iput(di_inode);
-				break;
+				continue;
 			}
 
 			ctx->log_new_dentries = false;
 			if (type == BTRFS_FT_DIR || type == BTRFS_FT_SYMLINK)
 				log_mode = LOG_INODE_ALL;
+			btrfs_release_path(path);
 			ret = btrfs_log_inode(trans, root, di_inode,
 					      log_mode, 0, LLONG_MAX, ctx);
 			if (!ret &&

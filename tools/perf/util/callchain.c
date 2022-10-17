@@ -193,6 +193,7 @@ int perf_callchain_config(const char *var, const char *value)
 
 	if (!strcmp(var, "record-mode"))
 		return parse_callchain_record_opt(value, &callchain_param);
+#ifdef HAVE_DWARF_UNWIND_SUPPORT
 	if (!strcmp(var, "dump-size")) {
 		unsigned long size = 0;
 		int ret;
@@ -202,6 +203,7 @@ int perf_callchain_config(const char *var, const char *value)
 
 		return ret;
 	}
+#endif
 	if (!strcmp(var, "print-type"))
 		return parse_callchain_mode(value);
 	if (!strcmp(var, "order"))
@@ -437,7 +439,7 @@ fill_node(struct callchain_node *node, struct callchain_cursor *cursor)
 		}
 		call->ip = cursor_node->ip;
 		call->ms.sym = cursor_node->sym;
-		call->ms.map = map__get(cursor_node->map);
+		call->ms.map = cursor_node->map;
 		list_add_tail(&call->list, &node->val);
 
 		callchain_cursor_advance(cursor);
@@ -462,7 +464,6 @@ add_child(struct callchain_node *parent,
 
 		list_for_each_entry_safe(call, tmp, &new->val, list) {
 			list_del(&call->list);
-			map__zput(call->ms.map);
 			free(call);
 		}
 		free(new);
@@ -731,7 +732,6 @@ merge_chain_branch(struct callchain_cursor *cursor,
 		callchain_cursor_append(cursor, list->ip,
 					list->ms.map, list->ms.sym);
 		list_del(&list->list);
-		map__zput(list->ms.map);
 		free(list);
 	}
 
@@ -780,8 +780,7 @@ int callchain_cursor_append(struct callchain_cursor *cursor,
 	}
 
 	node->ip = ip;
-	map__zput(node->map);
-	node->map = map__get(map);
+	node->map = map;
 	node->sym = sym;
 
 	cursor->nr++;
@@ -948,13 +947,11 @@ static void free_callchain_node(struct callchain_node *node)
 
 	list_for_each_entry_safe(list, tmp, &node->parent_val, list) {
 		list_del(&list->list);
-		map__zput(list->ms.map);
 		free(list);
 	}
 
 	list_for_each_entry_safe(list, tmp, &node->val, list) {
 		list_del(&list->list);
-		map__zput(list->ms.map);
 		free(list);
 	}
 
@@ -1018,7 +1015,6 @@ int callchain_node__make_parent_list(struct callchain_node *node)
 				goto out;
 			*new = *chain;
 			new->has_children = false;
-			map__get(new->ms.map);
 			list_add_tail(&new->list, &head);
 		}
 		parent = parent->parent;
@@ -1039,7 +1035,6 @@ int callchain_node__make_parent_list(struct callchain_node *node)
 out:
 	list_for_each_entry_safe(chain, new, &head, list) {
 		list_del(&chain->list);
-		map__zput(chain->ms.map);
 		free(chain);
 	}
 	return -ENOMEM;

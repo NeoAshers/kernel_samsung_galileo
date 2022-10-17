@@ -233,7 +233,7 @@ static int __init mlxplat_init(void)
 	return 0;
 
 fail_platform_mux_register:
-	while (--i >= 0)
+	for (i--; i > 0 ; i--)
 		platform_device_unregister(priv->pdev_mux[i]);
 	platform_device_unregister(priv->pdev_i2c);
 fail_alloc:

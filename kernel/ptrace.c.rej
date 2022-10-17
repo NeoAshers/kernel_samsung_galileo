@@ -1,0 +1,18 @@
+--- kernel/ptrace.c
++++ kernel/ptrace.c
+@@ -34,11 +-4,11 @@
+  *
+  * Must be called with the tasklist lock write-held.
+  */
+-static void ptrace_link(struct task_struct *child, struct task_struct *new_parent)
++void __ptrace_link(struct task_struct *child, struct task_struct *new_parent)
+ {
+-	rcu_read_lock();
+-	__ptrace_link(child, new_parent, __task_cred(new_parent));
+-	rcu_read_unlock();
++	BUG_ON(!list_empty(&child->ptrace_entry));
++	list_add(&child->ptrace_entry, &new_parent->ptraced);
++	child->parent = new_parent;
+ }
+ 
+ /**

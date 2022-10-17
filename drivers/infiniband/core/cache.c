@@ -770,8 +770,12 @@ static int _gid_table_setup_one(struct ib_device *ib_dev)
 	int err = 0;
 
 	table = kcalloc(ib_dev->phys_port_cnt, sizeof(*table), GFP_KERNEL);
-	if (!table)
+
+	if (!table) {
+		pr_warn("failed to allocate ib gid cache for %s\n",
+			ib_dev->name);
 		return -ENOMEM;
+	}
 
 	for (port = 0; port < ib_dev->phys_port_cnt; port++) {
 		u8 rdma_port = port + rdma_start_port(ib_dev);
@@ -1166,13 +1170,14 @@ int ib_cache_setup_one(struct ib_device *device)
 					  GFP_KERNEL);
 	if (!device->cache.pkey_cache ||
 	    !device->cache.lmc_cache) {
-		err = -ENOMEM;
-		goto free;
+		pr_warn("Couldn't allocate cache for %s\n", device->name);
+		return -ENOMEM;
 	}
 
 	err = gid_table_setup_one(device);
 	if (err)
-		goto free;
+		/* Allocated memory will be cleaned in the release function */
+		return err;
 
 	for (p = 0; p <= rdma_end_port(device) - rdma_start_port(device); ++p)
 		ib_cache_update(device, p + rdma_start_port(device));
@@ -1187,9 +1192,6 @@ int ib_cache_setup_one(struct ib_device *device)
 
 err:
 	gid_table_cleanup_one(device);
-free:
-	kfree(device->cache.pkey_cache);
-	kfree(device->cache.lmc_cache);
 	return err;
 }
 

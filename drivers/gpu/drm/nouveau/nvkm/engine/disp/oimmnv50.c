@@ -33,7 +33,7 @@
 int
 nv50_disp_oimm_new(const struct nv50_disp_chan_func *func,
 		   const struct nv50_disp_chan_mthd *mthd,
-		   struct nv50_disp_root *root, int ctrl, int user,
+		   struct nv50_disp_root *root, int chid,
 		   const struct nvkm_oclass *oclass, void *data, u32 size,
 		   struct nvkm_object **pobject)
 {
@@ -54,7 +54,7 @@ nv50_disp_oimm_new(const struct nv50_disp_chan_func *func,
 	} else
 		return ret;
 
-	return nv50_disp_chan_new_(func, mthd, root, ctrl + head, user + head,
+	return nv50_disp_chan_new_(func, mthd, root, chid + head,
 				   head, oclass, pobject);
 }
 
@@ -65,5 +65,5 @@ nv50_disp_oimm_oclass = {
 	.base.maxver = 0,
 	.ctor = nv50_disp_oimm_new,
 	.func = &nv50_disp_pioc_func,
-	.chid = { 5, 5 },
+	.chid = 5,
 };

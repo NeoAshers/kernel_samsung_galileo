@@ -1039,22 +1039,16 @@ static netdev_tx_t geneve_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 	struct geneve_dev *geneve = netdev_priv(dev);
 	struct ip_tunnel_info *info = NULL;
-	int err;
 
 	if (geneve->collect_md)
 		info = skb_tunnel_info(skb);
 
-	rcu_read_lock();
 #if IS_ENABLED(CONFIG_IPV6)
 	if ((info && ip_tunnel_info_af(info) == AF_INET6) ||
 	    (!info && geneve->remote.sa.sa_family == AF_INET6))
-		err = geneve6_xmit_skb(skb, dev, info);
-	else
+		return geneve6_xmit_skb(skb, dev, info);
 #endif
-		err = geneve_xmit_skb(skb, dev, info);
-	rcu_read_unlock();
-
-	return err;
+	return geneve_xmit_skb(skb, dev, info);
 }
 
 static int __geneve_change_mtu(struct net_device *dev, int new_mtu, bool strict)

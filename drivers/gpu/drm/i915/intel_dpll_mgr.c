@@ -1723,8 +1723,7 @@ bxt_get_dpll(struct intel_crtc *crtc,
 		return NULL;
 
 	if ((encoder->type == INTEL_OUTPUT_DP ||
-	     encoder->type == INTEL_OUTPUT_EDP ||
-	     encoder->type == INTEL_OUTPUT_DP_MST) &&
+	     encoder->type == INTEL_OUTPUT_EDP) &&
 	    !bxt_ddi_dp_set_dpll_hw_state(clock, &dpll_hw_state))
 		return NULL;
 

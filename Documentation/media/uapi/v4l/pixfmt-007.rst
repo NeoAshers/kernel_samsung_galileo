@@ -211,13 +211,7 @@ Colorspace sRGB (V4L2_COLORSPACE_SRGB)
 The :ref:`srgb` standard defines the colorspace used by most webcams
 and computer graphics. The default transfer function is
 ``V4L2_XFER_FUNC_SRGB``. The default Y'CbCr encoding is
-``V4L2_YCBCR_ENC_601``. The default Y'CbCr quantization is limited range.
-
-Note that the :ref:`sycc` standard specifies full range quantization,
-however all current capture hardware supported by the kernel convert
-R'G'B' to limited range Y'CbCr. So choosing full range as the default
-would break how applications interpret the quantization range.
-
+``V4L2_YCBCR_ENC_601``. The default Y'CbCr quantization is full range.
 The chromaticities of the primary colors and the white reference are:
 
 
@@ -282,7 +276,7 @@ the following ``V4L2_YCBCR_ENC_601`` encoding as defined by :ref:`sycc`:
 
 Y' is clamped to the range [0…1] and Cb and Cr are clamped to the range
 [-0.5…0.5]. This transform is identical to one defined in SMPTE
-170M/BT.601. The Y'CbCr quantization is limited range.
+170M/BT.601. The Y'CbCr quantization is full range.
 
 
 .. _col-adobergb:
@@ -294,15 +288,10 @@ The :ref:`adobergb` standard defines the colorspace used by computer
 graphics that use the AdobeRGB colorspace. This is also known as the
 :ref:`oprgb` standard. The default transfer function is
 ``V4L2_XFER_FUNC_ADOBERGB``. The default Y'CbCr encoding is
-``V4L2_YCBCR_ENC_601``. The default Y'CbCr quantization is limited
-range.
+``V4L2_YCBCR_ENC_601``. The default Y'CbCr quantization is full
+range. The chromaticities of the primary colors and the white reference
+are:
 
-Note that the :ref:`oprgb` standard specifies full range quantization,
-however all current capture hardware supported by the kernel convert
-R'G'B' to limited range Y'CbCr. So choosing full range as the default
-would break how applications interpret the quantization range.
-
-The chromaticities of the primary colors and the white reference are:
 
 
 .. tabularcolumns:: |p{4.4cm}|p{4.4cm}|p{8.7cm}|
@@ -355,7 +344,7 @@ the following ``V4L2_YCBCR_ENC_601`` encoding:
 
 Y' is clamped to the range [0…1] and Cb and Cr are clamped to the range
 [-0.5…0.5]. This transform is identical to one defined in SMPTE
-170M/BT.601. The Y'CbCr quantization is limited range.
+170M/BT.601. The Y'CbCr quantization is full range.
 
 
 .. _col-bt2020:

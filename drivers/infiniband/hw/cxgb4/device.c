@@ -828,10 +828,8 @@ static int c4iw_rdev_open(struct c4iw_rdev *rdev)
 	}
 	rdev->status_page = (struct t4_dev_status_page *)
 			    __get_free_page(GFP_KERNEL);
-	if (!rdev->status_page) {
-		err = -ENOMEM;
+	if (!rdev->status_page)
 		goto destroy_ocqp_pool;
-	}
 	rdev->status_page->qp_start = rdev->lldi.vr->qp.start;
 	rdev->status_page->qp_size = rdev->lldi.vr->qp.size;
 	rdev->status_page->cq_start = rdev->lldi.vr->cq.start;
@@ -848,17 +846,9 @@ static int c4iw_rdev_open(struct c4iw_rdev *rdev)
 		}
 	}
 
-	rdev->free_workq = create_singlethread_workqueue("iw_cxgb4_free");
-	if (!rdev->free_workq) {
-		err = -ENOMEM;
-		goto err_free_status_page;
-	}
-
 	rdev->status_page->db_off = 0;
 
 	return 0;
-err_free_status_page:
-	free_page((unsigned long)rdev->status_page);
 destroy_ocqp_pool:
 	c4iw_ocqp_pool_destroy(rdev);
 destroy_rqtpool:
@@ -872,7 +862,6 @@ destroy_resource:
 
 static void c4iw_rdev_close(struct c4iw_rdev *rdev)
 {
-	destroy_workqueue(rdev->free_workq);
 	kfree(rdev->wr_log);
 	free_page((unsigned long)rdev->status_page);
 	c4iw_pblpool_destroy(rdev);

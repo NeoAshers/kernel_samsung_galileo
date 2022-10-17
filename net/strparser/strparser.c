@@ -504,7 +504,6 @@ static int __init strp_mod_init(void)
 
 static void __exit strp_mod_exit(void)
 {
-	destroy_workqueue(strp_wq);
 }
 module_init(strp_mod_init);
 module_exit(strp_mod_exit);

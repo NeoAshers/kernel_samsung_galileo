@@ -55,9 +55,10 @@ int i915_gem_stolen_insert_node_in_range(struct drm_i915_private *dev_priv,
 		return -ENODEV;
 
 	/* See the comment at the drm_mm_init() call for more about this check.
-	 * WaSkipStolenMemoryFirstPage:bdw+ (incomplete)
+	 * WaSkipStolenMemoryFirstPage:bdw,chv,kbl (incomplete)
 	 */
-	if (start < 4096 && INTEL_GEN(dev_priv) >= 8)
+	if (start < 4096 && (IS_GEN8(dev_priv) ||
+			     IS_KBL_REVID(dev_priv, 0, KBL_REVID_A0)))
 		start = 4096;
 
 	mutex_lock(&dev_priv->mm.stolen_lock);
@@ -414,16 +415,6 @@ int i915_gem_init_stolen(struct drm_device *dev)
 	unsigned long stolen_top;
 
 	mutex_init(&dev_priv->mm.stolen_lock);
-
-	if (intel_vgpu_active(dev_priv)) {
-		DRM_INFO("iGVT-g active, disabling use of stolen memory\n");
-		return 0;
-	}
-
-	if (intel_vgpu_active(dev_priv)) {
-		DRM_INFO("iGVT-g active, disabling use of stolen memory\n");
-		return 0;
-	}
 
 #ifdef CONFIG_INTEL_IOMMU
 	if (intel_iommu_gfx_mapped && INTEL_INFO(dev)->gen < 8) {

@@ -1395,23 +1395,14 @@ static struct btrfs_root *create_reloc_root(struct btrfs_trans_handle *trans,
 	root_key.offset = objectid;
 
 	if (root->root_key.objectid == objectid) {
-		u64 commit_root_gen;
-
 		/* called by btrfs_init_reloc_root */
 		ret = btrfs_copy_root(trans, root, root->commit_root, &eb,
 				      BTRFS_TREE_RELOC_OBJECTID);
 		BUG_ON(ret);
+
 		last_snap = btrfs_root_last_snapshot(&root->root_item);
-		/*
-		 * Set the last_snapshot field to the generation of the commit
-		 * root - like this ctree.c:btrfs_block_can_be_shared() behaves
-		 * correctly (returns true) when the relocation root is created
-		 * either inside the critical section of a transaction commit
-		 * (through transaction.c:qgroup_account_snapshot()) and when
-		 * it's created before the transaction commit is started.
-		 */
-		commit_root_gen = btrfs_header_generation(root->commit_root);
-		btrfs_set_root_last_snapshot(&root->root_item, commit_root_gen);
+		btrfs_set_root_last_snapshot(&root->root_item,
+					     trans->transid - 1);
 	} else {
 		/*
 		 * called by btrfs_reloc_post_snapshot_hook.
@@ -2367,11 +2358,11 @@ void free_reloc_roots(struct list_head *list)
 	while (!list_empty(list)) {
 		reloc_root = list_entry(list->next, struct btrfs_root,
 					root_list);
-		__del_reloc_root(reloc_root);
 		free_extent_buffer(reloc_root->node);
 		free_extent_buffer(reloc_root->commit_root);
 		reloc_root->node = NULL;
 		reloc_root->commit_root = NULL;
+		__del_reloc_root(reloc_root);
 	}
 }
 

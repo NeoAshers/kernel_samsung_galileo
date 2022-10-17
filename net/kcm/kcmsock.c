@@ -929,25 +929,23 @@ static int kcm_sendmsg(struct socket *sock, struct msghdr *msg, size_t len)
 			goto out_error;
 	}
 
-	if (msg_data_left(msg)) {
-		/* New message, alloc head skb */
+	/* New message, alloc head skb */
+	head = alloc_skb(0, sk->sk_allocation);
+	while (!head) {
+		kcm_push(kcm);
+		err = sk_stream_wait_memory(sk, &timeo);
+		if (err)
+			goto out_error;
+
 		head = alloc_skb(0, sk->sk_allocation);
-		while (!head) {
-			kcm_push(kcm);
-			err = sk_stream_wait_memory(sk, &timeo);
-			if (err)
-				goto out_error;
-
-			head = alloc_skb(0, sk->sk_allocation);
-		}
-
-		skb = head;
-
-		/* Set ip_summed to CHECKSUM_UNNECESSARY to avoid calling
-		 * csum_and_copy_from_iter from skb_do_copy_data_nocache.
-		 */
-		skb->ip_summed = CHECKSUM_UNNECESSARY;
 	}
+
+	skb = head;
+
+	/* Set ip_summed to CHECKSUM_UNNECESSARY to avoid calling
+	 * csum_and_copy_from_iter from skb_do_copy_data_nocache.
+	 */
+	skb->ip_summed = CHECKSUM_UNNECESSARY;
 
 start:
 	while (msg_data_left(msg)) {
@@ -1020,12 +1018,10 @@ wait_for_memory:
 	if (eor) {
 		bool not_busy = skb_queue_empty(&sk->sk_write_queue);
 
-		if (head) {
-			/* Message complete, queue it on send buffer */
-			__skb_queue_tail(&sk->sk_write_queue, head);
-			kcm->seq_skb = NULL;
-			KCM_STATS_INCR(kcm->stats.tx_msgs);
-		}
+		/* Message complete, queue it on send buffer */
+		__skb_queue_tail(&sk->sk_write_queue, head);
+		kcm->seq_skb = NULL;
+		KCM_STATS_INCR(kcm->stats.tx_msgs);
 
 		if (msg->msg_flags & MSG_BATCH) {
 			kcm->tx_wait_more = true;
@@ -1044,10 +1040,8 @@ wait_for_memory:
 	} else {
 		/* Message not complete, save state */
 partial_message:
-		if (head) {
-			kcm->seq_skb = head;
-			kcm_tx_msg(head)->last_skb = skb;
-		}
+		kcm->seq_skb = head;
+		kcm_tx_msg(head)->last_skb = skb;
 	}
 
 	KCM_STATS_ADD(kcm->stats.tx_bytes, copied);
@@ -1381,10 +1375,6 @@ static int kcm_attach(struct socket *sock, struct socket *csock,
 	if (!csk)
 		return -EINVAL;
 
-	/* We must prevent loops or risk deadlock ! */
-	if (csk->sk_family == PF_KCM)
-		return -EOPNOTSUPP;
-
 	psock = kmem_cache_zalloc(kcm_psockp, GFP_KERNEL);
 	if (!psock)
 		return -ENOMEM;
@@ -1689,7 +1679,7 @@ static int kcm_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 		struct kcm_attach info;
 
 		if (copy_from_user(&info, (void __user *)arg, sizeof(info)))
-			return -EFAULT;
+			err = -EFAULT;
 
 		err = kcm_attach_ioctl(sock, &info);
 
@@ -1699,7 +1689,7 @@ static int kcm_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 		struct kcm_unattach info;
 
 		if (copy_from_user(&info, (void __user *)arg, sizeof(info)))
-			return -EFAULT;
+			err = -EFAULT;
 
 		err = kcm_unattach_ioctl(sock, &info);
 
@@ -1710,7 +1700,7 @@ static int kcm_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 		struct socket *newsock = NULL;
 
 		if (copy_from_user(&info, (void __user *)arg, sizeof(info)))
-			return -EFAULT;
+			err = -EFAULT;
 
 		err = kcm_clone(sock, &info, &newsock);
 

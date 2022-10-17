@@ -731,23 +731,16 @@ static void __iomem *byt_gpio_reg(struct byt_gpio *vg, unsigned int offset,
 				  int reg)
 {
 	struct byt_community *comm = byt_get_community(vg, offset);
-	u32 reg_offset;
+	u32 reg_offset = 0;
 
 	if (!comm)
 		return NULL;
 
 	offset -= comm->pin_base;
-	switch (reg) {
-	case BYT_INT_STAT_REG:
+	if (reg == BYT_INT_STAT_REG)
 		reg_offset = (offset / 32) * 4;
-		break;
-	case BYT_DEBOUNCE_REG:
-		reg_offset = 0;
-		break;
-	default:
+	else
 		reg_offset = comm->pad_map[offset] * 16;
-		break;
-	}
 
 	return comm->reg_base + reg_offset + reg;
 }
@@ -1099,7 +1092,6 @@ static int byt_pin_config_get(struct pinctrl_dev *pctl_dev, unsigned int offset,
 	enum pin_config_param param = pinconf_to_config_param(*config);
 	void __iomem *conf_reg = byt_gpio_reg(vg, offset, BYT_CONF0_REG);
 	void __iomem *val_reg = byt_gpio_reg(vg, offset, BYT_VAL_REG);
-	void __iomem *db_reg = byt_gpio_reg(vg, offset, BYT_DEBOUNCE_REG);
 	unsigned long flags;
 	u32 conf, pull, val, debounce;
 	u16 arg = 0;
@@ -1136,7 +1128,7 @@ static int byt_pin_config_get(struct pinctrl_dev *pctl_dev, unsigned int offset,
 			return -EINVAL;
 
 		raw_spin_lock_irqsave(&vg->lock, flags);
-		debounce = readl(db_reg);
+		debounce = readl(byt_gpio_reg(vg, offset, BYT_DEBOUNCE_REG));
 		raw_spin_unlock_irqrestore(&vg->lock, flags);
 
 		switch (debounce & BYT_DEBOUNCE_PULSE_MASK) {
@@ -1184,7 +1176,6 @@ static int byt_pin_config_set(struct pinctrl_dev *pctl_dev,
 	unsigned int param, arg;
 	void __iomem *conf_reg = byt_gpio_reg(vg, offset, BYT_CONF0_REG);
 	void __iomem *val_reg = byt_gpio_reg(vg, offset, BYT_VAL_REG);
-	void __iomem *db_reg = byt_gpio_reg(vg, offset, BYT_DEBOUNCE_REG);
 	unsigned long flags;
 	u32 conf, val, debounce;
 	int i, ret = 0;
@@ -1247,44 +1238,36 @@ static int byt_pin_config_set(struct pinctrl_dev *pctl_dev,
 
 			break;
 		case PIN_CONFIG_INPUT_DEBOUNCE:
-			debounce = readl(db_reg);
-			debounce &= ~BYT_DEBOUNCE_PULSE_MASK;
-
-			if (arg)
-				conf |= BYT_DEBOUNCE_EN;
-			else
-				conf &= ~BYT_DEBOUNCE_EN;
+			debounce = readl(byt_gpio_reg(vg, offset,
+						      BYT_DEBOUNCE_REG));
+			conf &= ~BYT_DEBOUNCE_PULSE_MASK;
 
 			switch (arg) {
 			case 375:
-				debounce |= BYT_DEBOUNCE_PULSE_375US;
+				conf |= BYT_DEBOUNCE_PULSE_375US;
 				break;
 			case 750:
-				debounce |= BYT_DEBOUNCE_PULSE_750US;
+				conf |= BYT_DEBOUNCE_PULSE_750US;
 				break;
 			case 1500:
-				debounce |= BYT_DEBOUNCE_PULSE_1500US;
+				conf |= BYT_DEBOUNCE_PULSE_1500US;
 				break;
 			case 3000:
-				debounce |= BYT_DEBOUNCE_PULSE_3MS;
+				conf |= BYT_DEBOUNCE_PULSE_3MS;
 				break;
 			case 6000:
-				debounce |= BYT_DEBOUNCE_PULSE_6MS;
+				conf |= BYT_DEBOUNCE_PULSE_6MS;
 				break;
 			case 12000:
-				debounce |= BYT_DEBOUNCE_PULSE_12MS;
+				conf |= BYT_DEBOUNCE_PULSE_12MS;
 				break;
 			case 24000:
-				debounce |= BYT_DEBOUNCE_PULSE_24MS;
+				conf |= BYT_DEBOUNCE_PULSE_24MS;
 				break;
 			default:
-				if (arg)
-					ret = -EINVAL;
-				break;
+				ret = -EINVAL;
 			}
 
-			if (!ret)
-				writel(debounce, db_reg);
 			break;
 		default:
 			ret = -ENOTSUPP;
@@ -1623,9 +1606,7 @@ static void byt_gpio_irq_handler(struct irq_desc *desc)
 			continue;
 		}
 
-		raw_spin_lock(&vg->lock);
 		pending = readl(reg);
-		raw_spin_unlock(&vg->lock);
 		for_each_set_bit(pin, &pending, 32) {
 			virq = irq_find_mapping(vg->chip.irqdomain, base + pin);
 			generic_handle_irq(virq);

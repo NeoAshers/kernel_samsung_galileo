@@ -1,0 +1,91 @@
+--- drivers/mmc/core/host.c
++++ drivers/mmc/core/host.c
+@@ -267,62 +269,62 @@ int mmc_of_parse(struct mmc_host *host)
+ 	else if (ret != -ENOENT && ret != -ENOSYS)
+ 		return ret;
+ 
+-	if (device_property_read_bool(dev, "disable-wp"))
++	if (of_property_read_bool(np, "disable-wp"))
+ 		host->caps2 |= MMC_CAP2_NO_WRITE_PROTECT;
+ 
+ 	/* See the comment on CD inversion above */
+ 	if (ro_cap_invert ^ ro_gpio_invert)
+ 		host->caps2 |= MMC_CAP2_RO_ACTIVE_HIGH;
+ 
+-	if (device_property_read_bool(dev, "cap-sd-highspeed"))
++	if (of_property_read_bool(np, "cap-sd-highspeed"))
+ 		host->caps |= MMC_CAP_SD_HIGHSPEED;
+-	if (device_property_read_bool(dev, "cap-mmc-highspeed"))
++	if (of_property_read_bool(np, "cap-mmc-highspeed"))
+ 		host->caps |= MMC_CAP_MMC_HIGHSPEED;
+-	if (device_property_read_bool(dev, "sd-uhs-sdr12"))
++	if (of_property_read_bool(np, "sd-uhs-sdr12"))
+ 		host->caps |= MMC_CAP_UHS_SDR12;
+-	if (device_property_read_bool(dev, "sd-uhs-sdr25"))
++	if (of_property_read_bool(np, "sd-uhs-sdr25"))
+ 		host->caps |= MMC_CAP_UHS_SDR25;
+-	if (device_property_read_bool(dev, "sd-uhs-sdr50"))
++	if (of_property_read_bool(np, "sd-uhs-sdr50"))
+ 		host->caps |= MMC_CAP_UHS_SDR50;
+-	if (device_property_read_bool(dev, "sd-uhs-sdr104"))
++	if (of_property_read_bool(np, "sd-uhs-sdr104"))
+ 		host->caps |= MMC_CAP_UHS_SDR104;
+-	if (device_property_read_bool(dev, "sd-uhs-ddr50"))
++	if (of_property_read_bool(np, "sd-uhs-ddr50"))
+ 		host->caps |= MMC_CAP_UHS_DDR50;
+-	if (device_property_read_bool(dev, "cap-power-off-card"))
++	if (of_property_read_bool(np, "cap-power-off-card"))
+ 		host->caps |= MMC_CAP_POWER_OFF_CARD;
+-	if (device_property_read_bool(dev, "cap-mmc-hw-reset"))
++	if (of_property_read_bool(np, "cap-mmc-hw-reset"))
+ 		host->caps |= MMC_CAP_HW_RESET;
+-	if (device_property_read_bool(dev, "cap-sdio-irq"))
++	if (of_property_read_bool(np, "cap-sdio-irq"))
+ 		host->caps |= MMC_CAP_SDIO_IRQ;
+-	if (device_property_read_bool(dev, "full-pwr-cycle"))
++	if (of_property_read_bool(np, "full-pwr-cycle"))
+ 		host->caps2 |= MMC_CAP2_FULL_PWR_CYCLE;
+-	if (device_property_read_bool(dev, "keep-power-in-suspend"))
++	if (of_property_read_bool(np, "keep-power-in-suspend"))
+ 		host->pm_caps |= MMC_PM_KEEP_POWER;
+-	if (device_property_read_bool(dev, "wakeup-source") ||
+-	    device_property_read_bool(dev, "enable-sdio-wakeup")) /* legacy */
++	if (of_property_read_bool(np, "wakeup-source") ||
++	    of_property_read_bool(np, "enable-sdio-wakeup")) /* legacy */
+ 		host->pm_caps |= MMC_PM_WAKE_SDIO_IRQ;
+-	if (device_property_read_bool(dev, "mmc-ddr-1_8v"))
++	if (of_property_read_bool(np, "mmc-ddr-1_8v"))
+ 		host->caps |= MMC_CAP_1_8V_DDR;
+-	if (device_property_read_bool(dev, "mmc-ddr-1_2v"))
++	if (of_property_read_bool(np, "mmc-ddr-1_2v"))
+ 		host->caps |= MMC_CAP_1_2V_DDR;
+-	if (device_property_read_bool(dev, "mmc-hs200-1_8v"))
++	if (of_property_read_bool(np, "mmc-hs200-1_8v"))
+ 		host->caps2 |= MMC_CAP2_HS200_1_8V_SDR;
+-	if (device_property_read_bool(dev, "mmc-hs200-1_2v"))
++	if (of_property_read_bool(np, "mmc-hs200-1_2v"))
+ 		host->caps2 |= MMC_CAP2_HS200_1_2V_SDR;
+-	if (device_property_read_bool(dev, "mmc-hs400-1_8v"))
++	if (of_property_read_bool(np, "mmc-hs400-1_8v"))
+ 		host->caps2 |= MMC_CAP2_HS400_1_8V | MMC_CAP2_HS200_1_8V_SDR;
+-	if (device_property_read_bool(dev, "mmc-hs400-1_2v"))
++	if (of_property_read_bool(np, "mmc-hs400-1_2v"))
+ 		host->caps2 |= MMC_CAP2_HS400_1_2V | MMC_CAP2_HS200_1_2V_SDR;
+-	if (device_property_read_bool(dev, "mmc-hs400-enhanced-strobe"))
++	if (of_property_read_bool(np, "mmc-hs400-enhanced-strobe"))
+ 		host->caps2 |= MMC_CAP2_HS400_ES;
+-	if (device_property_read_bool(dev, "no-sdio"))
++	if (of_property_read_bool(np, "no-sdio"))
+ 		host->caps2 |= MMC_CAP2_NO_SDIO;
+-	if (device_property_read_bool(dev, "no-sd"))
++	if (of_property_read_bool(np, "no-sd"))
+ 		host->caps2 |= MMC_CAP2_NO_SD;
+-	if (device_property_read_bool(dev, "no-mmc"))
++	if (of_property_read_bool(np, "no-mmc"))
+ 		host->caps2 |= MMC_CAP2_NO_MMC;
+ 
+-	host->dsr_req = !device_property_read_u32(dev, "dsr", &host->dsr);
++	host->dsr_req = !of_property_read_u32(np, "dsr", &host->dsr);
+ 	if (host->dsr_req && (host->dsr & ~0xffff)) {
+ 		dev_err(host->parent,
+ 			"device tree specified broken value for DSR: 0x%x, ignoring\n",

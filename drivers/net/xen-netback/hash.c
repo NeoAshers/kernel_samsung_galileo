@@ -39,7 +39,7 @@ static void xenvif_add_hash(struct xenvif *vif, const u8 *tag,
 	unsigned long flags;
 	bool found;
 
-	new = kmalloc(sizeof(*entry), GFP_ATOMIC);
+	new = kmalloc(sizeof(*entry), GFP_KERNEL);
 	if (!new)
 		return;
 

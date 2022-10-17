@@ -16,7 +16,6 @@
 	interrupt-parent = <&wakeupgen>;
 	#address-cells = <1>;
 	#size-cells = <1>;
-	chosen { };
 
 	memory@0 {
 		device_type = "memory";

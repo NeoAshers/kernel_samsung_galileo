@@ -18,9 +18,6 @@
 #ifndef __XFS_DIR2_H__
 #define __XFS_DIR2_H__
 
-#include "xfs_da_format.h"
-#include "xfs_da_btree.h"
-
 struct xfs_defer_ops;
 struct xfs_da_args;
 struct xfs_inode;
@@ -35,9 +32,10 @@ struct xfs_dir2_data_unused;
 extern struct xfs_name	xfs_name_dotdot;
 
 /*
- * Convert inode mode to directory entry filetype
+ * directory filetype conversion tables.
  */
-extern unsigned char xfs_mode_to_ftype(int mode);
+#define S_SHIFT 12
+extern const unsigned char xfs_mode_to_ftype[];
 
 /*
  * directory operations vector for encode/decode routines

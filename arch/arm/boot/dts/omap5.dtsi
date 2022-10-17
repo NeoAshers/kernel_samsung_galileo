@@ -17,7 +17,6 @@
 
 	compatible = "ti,omap5";
 	interrupt-parent = <&wakeupgen>;
-	chosen { };
 
 	aliases {
 		i2c0 = &i2c1;
@@ -986,7 +985,6 @@
 			phy-names = "sata-phy";
 			clocks = <&sata_ref_clk>;
 			ti,hwmods = "sata";
-			ports-implemented = <0x1>;
 		};
 
 		dss: dss@58000000 {

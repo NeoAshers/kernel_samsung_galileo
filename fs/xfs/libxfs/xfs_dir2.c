@@ -36,29 +36,21 @@
 struct xfs_name xfs_name_dotdot = { (unsigned char *)"..", 2, XFS_DIR3_FT_DIR };
 
 /*
- * Convert inode mode to directory entry filetype
+ * @mode, if set, indicates that the type field needs to be set up.
+ * This uses the transformation from file mode to DT_* as defined in linux/fs.h
+ * for file type specification. This will be propagated into the directory
+ * structure if appropriate for the given operation and filesystem config.
  */
-unsigned char xfs_mode_to_ftype(int mode)
-{
-	switch (mode & S_IFMT) {
-	case S_IFREG:
-		return XFS_DIR3_FT_REG_FILE;
-	case S_IFDIR:
-		return XFS_DIR3_FT_DIR;
-	case S_IFCHR:
-		return XFS_DIR3_FT_CHRDEV;
-	case S_IFBLK:
-		return XFS_DIR3_FT_BLKDEV;
-	case S_IFIFO:
-		return XFS_DIR3_FT_FIFO;
-	case S_IFSOCK:
-		return XFS_DIR3_FT_SOCK;
-	case S_IFLNK:
-		return XFS_DIR3_FT_SYMLINK;
-	default:
-		return XFS_DIR3_FT_UNKNOWN;
-	}
-}
+const unsigned char xfs_mode_to_ftype[S_IFMT >> S_SHIFT] = {
+	[0]			= XFS_DIR3_FT_UNKNOWN,
+	[S_IFREG >> S_SHIFT]    = XFS_DIR3_FT_REG_FILE,
+	[S_IFDIR >> S_SHIFT]    = XFS_DIR3_FT_DIR,
+	[S_IFCHR >> S_SHIFT]    = XFS_DIR3_FT_CHRDEV,
+	[S_IFBLK >> S_SHIFT]    = XFS_DIR3_FT_BLKDEV,
+	[S_IFIFO >> S_SHIFT]    = XFS_DIR3_FT_FIFO,
+	[S_IFSOCK >> S_SHIFT]   = XFS_DIR3_FT_SOCK,
+	[S_IFLNK >> S_SHIFT]    = XFS_DIR3_FT_SYMLINK,
+};
 
 /*
  * ASCII case-insensitive (ie. A-Z) support for directories that was
@@ -639,8 +631,7 @@ xfs_dir2_isblock(
 	if ((rval = xfs_bmap_last_offset(args->dp, &last, XFS_DATA_FORK)))
 		return rval;
 	rval = XFS_FSB_TO_B(args->dp->i_mount, last) == args->geo->blksize;
-	if (rval != 0 && args->dp->i_d.di_size != args->geo->blksize)
-		return -EFSCORRUPTED;
+	ASSERT(rval == 0 || args->dp->i_d.di_size == args->geo->blksize);
 	*vp = rval;
 	return 0;
 }

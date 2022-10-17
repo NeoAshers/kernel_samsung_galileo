@@ -784,10 +784,8 @@ int acpi_cppc_processor_probe(struct acpi_processor *pr)
 
 	/* Add per logical CPU nodes for reading its feedback counters. */
 	cpu_dev = get_cpu_device(pr->id);
-	if (!cpu_dev) {
-		ret = -EINVAL;
+	if (!cpu_dev)
 		goto out_free;
-	}
 
 	ret = kobject_init_and_add(&cpc_ptr->kobj, &cppc_ktype, &cpu_dev->kobj,
 			"acpi_cppc");

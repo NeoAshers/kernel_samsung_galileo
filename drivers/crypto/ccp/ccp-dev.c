@@ -283,13 +283,10 @@ EXPORT_SYMBOL_GPL(ccp_version);
  */
 int ccp_enqueue_cmd(struct ccp_cmd *cmd)
 {
-	struct ccp_device *ccp;
+	struct ccp_device *ccp = ccp_get_device();
 	unsigned long flags;
 	unsigned int i;
 	int ret;
-
-	/* Some commands might need to be sent to a specific device */
-	ccp = cmd->ccp ? cmd->ccp : ccp_get_device();
 
 	if (!ccp)
 		return -ENODEV;

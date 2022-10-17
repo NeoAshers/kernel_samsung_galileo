@@ -813,7 +813,8 @@ void rxe_qp_destroy(struct rxe_qp *qp)
 	del_timer_sync(&qp->rnr_nak_timer);
 
 	rxe_cleanup_task(&qp->req.task);
-	rxe_cleanup_task(&qp->comp.task);
+	if (qp_type(qp) == IB_QPT_RC)
+		rxe_cleanup_task(&qp->comp.task);
 
 	/* flush out any receive wr's or pending requests */
 	__rxe_do_task(&qp->req.task);
@@ -854,5 +855,4 @@ void rxe_qp_cleanup(void *arg)
 	free_rd_atomic_resources(qp);
 
 	kernel_sock_shutdown(qp->sk, SHUT_RDWR);
-	sock_release(qp->sk);
 }

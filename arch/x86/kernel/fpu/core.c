@@ -236,8 +236,7 @@ void fpstate_init(union fpregs_state *state)
 	 * it will #GP. Make sure it is replaced after the memset().
 	 */
 	if (static_cpu_has(X86_FEATURE_XSAVES))
-		state->xsave.header.xcomp_bv = XCOMP_BV_COMPACTED_FORMAT |
-					       xfeatures_mask;
+		state->xsave.header.xcomp_bv = XCOMP_BV_COMPACTED_FORMAT;
 
 	if (static_cpu_has(X86_FEATURE_FXSR))
 		fpstate_init_fxstate(&state->fxsave);

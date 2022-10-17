@@ -17,7 +17,6 @@
 	interrupt-parent = <&intc>;
 	#address-cells = <1>;
 	#size-cells = <1>;
-	chosen { };
 
 	aliases {
 		serial0 = &uart1;

@@ -273,7 +273,6 @@ static int dsa_user_port_apply(struct device_node *port, u32 index,
 	if (err) {
 		dev_warn(ds->dev, "Failed to create slave %d: %d\n",
 			 index, err);
-		ds->ports[index].netdev = NULL;
 		return err;
 	}
 
@@ -395,11 +394,9 @@ static int dsa_dst_apply(struct dsa_switch_tree *dst)
 			return err;
 	}
 
-	if (dst->ds[0]) {
-		err = dsa_cpu_port_ethtool_setup(dst->ds[0]);
-		if (err)
-			return err;
-	}
+	err = dsa_cpu_port_ethtool_setup(dst->ds[0]);
+	if (err)
+		return err;
 
 	/* If we use a tagging format that doesn't have an ethertype
 	 * field, make sure that all packets from this point on get
@@ -436,8 +433,7 @@ static void dsa_dst_unapply(struct dsa_switch_tree *dst)
 		dsa_ds_unapply(dst, ds);
 	}
 
-	if (dst->ds[0])
-		dsa_cpu_port_ethtool_restore(dst->ds[0]);
+	dsa_cpu_port_ethtool_restore(dst->ds[0]);
 
 	pr_info("DSA: tree %d unapplied\n", dst->tree);
 	dst->applied = false;

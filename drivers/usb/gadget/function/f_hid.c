@@ -50,12 +50,12 @@ struct f_hidg {
 
 	/* recv report */
 	struct list_head		completed_out_req;
-	spinlock_t			read_spinlock;
+	spinlock_t			spinlock;
 	wait_queue_head_t		read_queue;
 	unsigned int			qlen;
 
 	/* send report */
-	spinlock_t			write_spinlock;
+	struct mutex			lock;
 	bool				write_pending;
 	wait_queue_head_t		write_queue;
 	struct usb_request		*req;
@@ -204,35 +204,28 @@ static ssize_t f_hidg_read(struct file *file, char __user *buffer,
 	if (!access_ok(VERIFY_WRITE, buffer, count))
 		return -EFAULT;
 
-	spin_lock_irqsave(&hidg->read_spinlock, flags);
+	spin_lock_irqsave(&hidg->spinlock, flags);
 
 #define READ_COND (!list_empty(&hidg->completed_out_req))
 
 	/* wait for at least one buffer to complete */
 	while (!READ_COND) {
-		spin_unlock_irqrestore(&hidg->read_spinlock, flags);
+		spin_unlock_irqrestore(&hidg->spinlock, flags);
 		if (file->f_flags & O_NONBLOCK)
 			return -EAGAIN;
 
 		if (wait_event_interruptible(hidg->read_queue, READ_COND))
 			return -ERESTARTSYS;
 
-		spin_lock_irqsave(&hidg->read_spinlock, flags);
+		spin_lock_irqsave(&hidg->spinlock, flags);
 	}
 
 	/* pick the first one */
 	list = list_first_entry(&hidg->completed_out_req,
 				struct f_hidg_req_list, list);
-
-	/*
-	 * Remove this from list to protect it from beign free()
-	 * while host disables our function
-	 */
-	list_del(&list->list);
-
 	req = list->req;
 	count = min_t(unsigned int, count, req->actual - list->pos);
-	spin_unlock_irqrestore(&hidg->read_spinlock, flags);
+	spin_unlock_irqrestore(&hidg->spinlock, flags);
 
 	/* copy to user outside spinlock */
 	count -= copy_to_user(buffer, req->buf + list->pos, count);
@@ -245,20 +238,15 @@ static ssize_t f_hidg_read(struct file *file, char __user *buffer,
 	 * call, taking into account its current read position.
 	 */
 	if (list->pos == req->actual) {
+		spin_lock_irqsave(&hidg->spinlock, flags);
+		list_del(&list->list);
 		kfree(list);
+		spin_unlock_irqrestore(&hidg->spinlock, flags);
 
 		req->length = hidg->report_length;
 		ret = usb_ep_queue(hidg->out_ep, req, GFP_KERNEL);
-		if (ret < 0) {
-			free_ep_req(hidg->out_ep, req);
+		if (ret < 0)
 			return ret;
-		}
-	} else {
-		spin_lock_irqsave(&hidg->read_spinlock, flags);
-		list_add(&list->list, &hidg->completed_out_req);
-		spin_unlock_irqrestore(&hidg->read_spinlock, flags);
-
-		wake_up(&hidg->read_queue);
 	}
 
 	return count;
@@ -267,16 +255,13 @@ static ssize_t f_hidg_read(struct file *file, char __user *buffer,
 static void f_hidg_req_complete(struct usb_ep *ep, struct usb_request *req)
 {
 	struct f_hidg *hidg = (struct f_hidg *)ep->driver_data;
-	unsigned long flags;
 
 	if (req->status != 0) {
 		ERROR(hidg->func.config->cdev,
 			"End Point Request ERROR: %d\n", req->status);
 	}
 
-	spin_lock_irqsave(&hidg->write_spinlock, flags);
 	hidg->write_pending = 0;
-	spin_unlock_irqrestore(&hidg->write_spinlock, flags);
 	wake_up(&hidg->write_queue);
 }
 
@@ -284,19 +269,18 @@ static ssize_t f_hidg_write(struct file *file, const char __user *buffer,
 			    size_t count, loff_t *offp)
 {
 	struct f_hidg *hidg  = file->private_data;
-	unsigned long flags;
 	ssize_t status = -ENOMEM;
 
 	if (!access_ok(VERIFY_READ, buffer, count))
 		return -EFAULT;
 
-	spin_lock_irqsave(&hidg->write_spinlock, flags);
+	mutex_lock(&hidg->lock);
 
 #define WRITE_COND (!hidg->write_pending)
 
 	/* write queue */
 	while (!WRITE_COND) {
-		spin_unlock_irqrestore(&hidg->write_spinlock, flags);
+		mutex_unlock(&hidg->lock);
 		if (file->f_flags & O_NONBLOCK)
 			return -EAGAIN;
 
@@ -304,20 +288,17 @@ static ssize_t f_hidg_write(struct file *file, const char __user *buffer,
 				hidg->write_queue, WRITE_COND))
 			return -ERESTARTSYS;
 
-		spin_lock_irqsave(&hidg->write_spinlock, flags);
+		mutex_lock(&hidg->lock);
 	}
 
-	hidg->write_pending = 1;
 	count  = min_t(unsigned, count, hidg->report_length);
-
-	spin_unlock_irqrestore(&hidg->write_spinlock, flags);
 	status = copy_from_user(hidg->req->buf, buffer, count);
 
 	if (status != 0) {
 		ERROR(hidg->func.config->cdev,
 			"copy_from_user error\n");
-		status = -EINVAL;
-		goto release_write_pending;
+		mutex_unlock(&hidg->lock);
+		return -EINVAL;
 	}
 
 	hidg->req->status   = 0;
@@ -325,23 +306,19 @@ static ssize_t f_hidg_write(struct file *file, const char __user *buffer,
 	hidg->req->length   = count;
 	hidg->req->complete = f_hidg_req_complete;
 	hidg->req->context  = hidg;
+	hidg->write_pending = 1;
 
 	status = usb_ep_queue(hidg->in_ep, hidg->req, GFP_ATOMIC);
 	if (status < 0) {
 		ERROR(hidg->func.config->cdev,
 			"usb_ep_queue error on int endpoint %zd\n", status);
-		goto release_write_pending;
+		hidg->write_pending = 0;
+		wake_up(&hidg->write_queue);
 	} else {
 		status = count;
 	}
 
-	return status;
-release_write_pending:
-	spin_lock_irqsave(&hidg->write_spinlock, flags);
-	hidg->write_pending = 0;
-	spin_unlock_irqrestore(&hidg->write_spinlock, flags);
-
-	wake_up(&hidg->write_queue);
+	mutex_unlock(&hidg->lock);
 
 	return status;
 }
@@ -394,36 +371,20 @@ static inline struct usb_request *hidg_alloc_ep_req(struct usb_ep *ep,
 static void hidg_set_report_complete(struct usb_ep *ep, struct usb_request *req)
 {
 	struct f_hidg *hidg = (struct f_hidg *) req->context;
-	struct usb_composite_dev *cdev = hidg->func.config->cdev;
 	struct f_hidg_req_list *req_list;
 	unsigned long flags;
 
-	switch (req->status) {
-	case 0:
-		req_list = kzalloc(sizeof(*req_list), GFP_ATOMIC);
-		if (!req_list) {
-			ERROR(cdev, "Unable to allocate mem for req_list\n");
-			goto free_req;
-		}
-
-		req_list->req = req;
-
-		spin_lock_irqsave(&hidg->read_spinlock, flags);
-		list_add_tail(&req_list->list, &hidg->completed_out_req);
-		spin_unlock_irqrestore(&hidg->read_spinlock, flags);
-
-		wake_up(&hidg->read_queue);
-		break;
-	default:
-		ERROR(cdev, "Set report failed %d\n", req->status);
-		/* FALLTHROUGH */
-	case -ECONNABORTED:		/* hardware forced ep reset */
-	case -ECONNRESET:		/* request dequeued */
-	case -ESHUTDOWN:		/* disconnect from host */
-free_req:
-		free_ep_req(ep, req);
+	req_list = kzalloc(sizeof(*req_list), GFP_ATOMIC);
+	if (!req_list)
 		return;
-	}
+
+	req_list->req = req;
+
+	spin_lock_irqsave(&hidg->spinlock, flags);
+	list_add_tail(&req_list->list, &hidg->completed_out_req);
+	spin_unlock_irqrestore(&hidg->spinlock, flags);
+
+	wake_up(&hidg->read_queue);
 }
 
 static int hidg_setup(struct usb_function *f,
@@ -529,18 +490,14 @@ static void hidg_disable(struct usb_function *f)
 {
 	struct f_hidg *hidg = func_to_hidg(f);
 	struct f_hidg_req_list *list, *next;
-	unsigned long flags;
 
 	usb_ep_disable(hidg->in_ep);
 	usb_ep_disable(hidg->out_ep);
 
-	spin_lock_irqsave(&hidg->read_spinlock, flags);
 	list_for_each_entry_safe(list, next, &hidg->completed_out_req, list) {
-		free_ep_req(hidg->out_ep, list->req);
 		list_del(&list->list);
 		kfree(list);
 	}
-	spin_unlock_irqrestore(&hidg->read_spinlock, flags);
 }
 
 static int hidg_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
@@ -582,7 +539,7 @@ static int hidg_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 		}
 		status = usb_ep_enable(hidg->out_ep);
 		if (status < 0) {
-			ERROR(cdev, "Enable OUT endpoint FAILED!\n");
+			ERROR(cdev, "Enable IN endpoint FAILED!\n");
 			goto fail;
 		}
 		hidg->out_ep->driver_data = hidg;
@@ -689,8 +646,8 @@ static int hidg_bind(struct usb_configuration *c, struct usb_function *f)
 	if (status)
 		goto fail;
 
-	spin_lock_init(&hidg->write_spinlock);
-	spin_lock_init(&hidg->read_spinlock);
+	mutex_init(&hidg->lock);
+	spin_lock_init(&hidg->spinlock);
 	init_waitqueue_head(&hidg->write_queue);
 	init_waitqueue_head(&hidg->read_queue);
 	INIT_LIST_HEAD(&hidg->completed_out_req);

@@ -177,7 +177,7 @@
 #include "acmsvc.h"
 
 #elif defined(__INTEL_COMPILER)
-#include <acpi/platform/acintel.h>
+#include "acintel.h"
 
 #endif
 

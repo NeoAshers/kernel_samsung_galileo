@@ -424,8 +424,7 @@ early_param("disable_radix", parse_disable_radix);
 void __init mmu_early_init_devtree(void)
 {
 	/* Disable radix mode based on kernel command line. */
-	/* We don't yet have the machinery to do radix as a guest. */
-	if (disable_radix || !(mfmsr() & MSR_HV))
+	if (disable_radix)
 		cur_cpu_spec->mmu_features &= ~MMU_FTR_TYPE_RADIX;
 
 	if (early_radix_enabled())

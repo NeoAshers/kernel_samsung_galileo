@@ -1658,7 +1658,7 @@ static void call_console_drivers(int level,
 {
 	struct console *con;
 
-	trace_console_rcuidle(text, len);
+	trace_console(text, len);
 
 	if (!console_drivers)
 		return;

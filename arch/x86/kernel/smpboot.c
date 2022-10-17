@@ -104,6 +104,7 @@ static unsigned int max_physical_pkg_id __read_mostly;
 unsigned int __max_logical_packages __read_mostly;
 EXPORT_SYMBOL(__max_logical_packages);
 static unsigned int logical_packages __read_mostly;
+static bool logical_packages_frozen __read_mostly;
 
 /* Maximum number of SMT threads on any online core */
 int __max_smt_threads __read_mostly;
@@ -262,14 +263,9 @@ static void notrace start_secondary(void *unused)
 	cpu_startup_entry(CPUHP_AP_ONLINE_IDLE);
 }
 
-/**
- * topology_update_package_map - Update the physical to logical package map
- * @pkg:	The physical package id as retrieved via CPUID
- * @cpu:	The cpu for which this is updated
- */
-int topology_update_package_map(unsigned int pkg, unsigned int cpu)
+int topology_update_package_map(unsigned int apicid, unsigned int cpu)
 {
-	unsigned int new;
+	unsigned int new, pkg = apicid >> boot_cpu_data.x86_coreid_bits;
 
 	/* Called from early boot ? */
 	if (!physical_package_map)
@@ -282,17 +278,16 @@ int topology_update_package_map(unsigned int pkg, unsigned int cpu)
 	if (test_and_set_bit(pkg, physical_package_map))
 		goto found;
 
-	if (logical_packages >= __max_logical_packages) {
-		pr_warn("Package %u of CPU %u exceeds BIOS package data %u.\n",
-			logical_packages, cpu, __max_logical_packages);
+	if (logical_packages_frozen) {
+		physical_to_logical_pkg[pkg] = -1;
+		pr_warn("APIC(%x) Package %u exceeds logical package max\n",
+			apicid, pkg);
 		return -ENOSPC;
 	}
 
 	new = logical_packages++;
-	if (new != pkg) {
-		pr_info("CPU %u Converting physical %u to logical package %u\n",
-			cpu, pkg, new);
-	}
+	pr_info("APIC(%x) Converting physical %u to logical package %u\n",
+		apicid, pkg, new);
 	physical_to_logical_pkg[pkg] = new;
 
 found:
@@ -313,9 +308,9 @@ int topology_phys_to_logical_pkg(unsigned int phys_pkg)
 }
 EXPORT_SYMBOL(topology_phys_to_logical_pkg);
 
-static void __init smp_init_package_map(struct cpuinfo_x86 *c, unsigned int cpu)
+static void __init smp_init_package_map(void)
 {
-	unsigned int ncpus;
+	unsigned int ncpus, cpu;
 	size_t size;
 
 	/*
@@ -360,9 +355,27 @@ static void __init smp_init_package_map(struct cpuinfo_x86 *c, unsigned int cpu)
 	size = BITS_TO_LONGS(max_physical_pkg_id) * sizeof(unsigned long);
 	physical_package_map = kzalloc(size, GFP_KERNEL);
 
-	pr_info("Max logical packages: %u\n", __max_logical_packages);
+	for_each_present_cpu(cpu) {
+		unsigned int apicid = apic->cpu_present_to_apicid(cpu);
 
-	topology_update_package_map(c->phys_proc_id, cpu);
+		if (apicid == BAD_APICID || !apic->apic_id_valid(apicid))
+			continue;
+		if (!topology_update_package_map(apicid, cpu))
+			continue;
+		pr_warn("CPU %u APICId %x disabled\n", cpu, apicid);
+		per_cpu(x86_bios_cpu_apicid, cpu) = BAD_APICID;
+		set_cpu_possible(cpu, false);
+		set_cpu_present(cpu, false);
+	}
+
+	if (logical_packages > __max_logical_packages) {
+		pr_warn("Detected more packages (%u), then computed by BIOS data (%u).\n",
+			logical_packages, __max_logical_packages);
+		logical_packages_frozen = true;
+		__max_logical_packages  = logical_packages;
+	}
+
+	pr_info("Max logical packages: %u\n", __max_logical_packages);
 }
 
 void __init smp_store_boot_cpu_info(void)
@@ -372,7 +385,7 @@ void __init smp_store_boot_cpu_info(void)
 
 	*c = boot_cpu_data;
 	c->cpu_index = id;
-	smp_init_package_map(c, id);
+	smp_init_package_map();
 }
 
 /*
@@ -423,15 +436,9 @@ static bool match_smt(struct cpuinfo_x86 *c, struct cpuinfo_x86 *o)
 		int cpu1 = c->cpu_index, cpu2 = o->cpu_index;
 
 		if (c->phys_proc_id == o->phys_proc_id &&
-		    per_cpu(cpu_llc_id, cpu1) == per_cpu(cpu_llc_id, cpu2)) {
-			if (c->cpu_core_id == o->cpu_core_id)
-				return topology_sane(c, o, "smt");
-
-			if ((c->cu_id != 0xff) &&
-			    (o->cu_id != 0xff) &&
-			    (c->cu_id == o->cu_id))
-				return topology_sane(c, o, "smt");
-		}
+		    per_cpu(cpu_llc_id, cpu1) == per_cpu(cpu_llc_id, cpu2) &&
+		    c->cpu_core_id == o->cpu_core_id)
+			return topology_sane(c, o, "smt");
 
 	} else if (c->phys_proc_id == o->phys_proc_id &&
 		   c->cpu_core_id == o->cpu_core_id) {

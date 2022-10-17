@@ -71,8 +71,7 @@
  * a) select an implementation using busy loop polling on those systems
  * b) use the checksum to do some probabilistic decoding
  */
-#define DHT11_START_TRANSMISSION_MIN	18000  /* us */
-#define DHT11_START_TRANSMISSION_MAX	20000  /* us */
+#define DHT11_START_TRANSMISSION	18  /* ms */
 #define DHT11_MIN_TIMERES	34000  /* ns */
 #define DHT11_THRESHOLD		49000  /* ns */
 #define DHT11_AMBIG_LOW		23000  /* ns */
@@ -229,8 +228,7 @@ static int dht11_read_raw(struct iio_dev *iio_dev,
 		ret = gpio_direction_output(dht11->gpio, 0);
 		if (ret)
 			goto err;
-		usleep_range(DHT11_START_TRANSMISSION_MIN,
-			     DHT11_START_TRANSMISSION_MAX);
+		msleep(DHT11_START_TRANSMISSION);
 		ret = gpio_direction_input(dht11->gpio);
 		if (ret)
 			goto err;

@@ -1,0 +1,16 @@
+--- drivers/usb/dwc3/host.c
++++ drivers/usb/dwc3/host.c
+@@ -21,12 +21,11 @@
+ 
+ int dwc3_host_init(struct dwc3 *dwc)
+ {
+-	struct property_entry	props[3];
++	struct property_entry	props[2];
+ 	struct platform_device	*xhci;
+ 	int			ret, irq;
+ 	struct resource		*res;
+ 	struct platform_device	*dwc3_pdev = to_platform_device(dwc->dev);
+-	int			prop_idx = 0;
+ 
+ 	irq = platform_get_irq_byname(dwc3_pdev, "host");
+ 	if (irq == -EPROBE_DEFER)
