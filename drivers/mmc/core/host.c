@@ -177,19 +177,17 @@ static void mmc_retune_timer(unsigned long data)
  */
 int mmc_of_parse(struct mmc_host *host)
 {
-	struct device_node *np;
+	struct device *dev = host->parent;
 	u32 bus_width;
 	int ret;
 	bool cd_cap_invert, cd_gpio_invert = false;
 	bool ro_cap_invert, ro_gpio_invert = false;
 
-	if (!host->parent || !host->parent->of_node)
+	if (!dev || !dev_fwnode(dev))
 		return 0;
 
-	np = host->parent->of_node;
-
 	/* "bus-width" is translated to MMC_CAP_*_BIT_DATA flags */
-	if (of_property_read_u32(np, "bus-width", &bus_width) < 0) {
+	if (device_property_read_u32(dev, "bus-width", &bus_width) < 0) {
 		dev_dbg(host->parent,
 			"\"bus-width\" property is missing, assuming 1 bit.\n");
 		bus_width = 1;
@@ -211,7 +209,7 @@ int mmc_of_parse(struct mmc_host *host)
 	}
 
 	/* f_max is obtained from the optional "max-frequency" property */
-	of_property_read_u32(np, "max-frequency", &host->f_max);
+	device_property_read_u32(dev, "max-frequency", &host->f_max);
 
 	/*
 	 * Configure CD and WP pins. They are both by default active low to
@@ -226,12 +224,12 @@ int mmc_of_parse(struct mmc_host *host)
 	 */
 
 	/* Parse Card Detection */
-	if (of_property_read_bool(np, "non-removable")) {
+	if (device_property_read_bool(dev, "non-removable")) {
 		host->caps |= MMC_CAP_NONREMOVABLE;
 	} else {
-		cd_cap_invert = of_property_read_bool(np, "cd-inverted");
+		cd_cap_invert = device_property_read_bool(dev, "cd-inverted");
 
-		if (of_property_read_bool(np, "broken-cd"))
+		if (device_property_read_bool(dev, "broken-cd"))
 			host->caps |= MMC_CAP_NEEDS_POLL;
 
 		ret = mmc_gpiod_request_cd(host, "cd", 0, true,
@@ -257,7 +255,7 @@ int mmc_of_parse(struct mmc_host *host)
 	}
 
 	/* Parse Write Protection */
-	ro_cap_invert = of_property_read_bool(np, "wp-inverted");
+	ro_cap_invert = device_property_read_bool(dev, "wp-inverted");
 
 	ret = mmc_gpiod_request_ro(host, "wp", 0, false, 0, &ro_gpio_invert);
 	if (!ret)
