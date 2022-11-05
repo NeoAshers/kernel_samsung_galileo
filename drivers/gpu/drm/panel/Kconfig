@@ -57,6 +57,12 @@ config DRM_PANEL_SAMSUNG_S6E8AA0
 	depends on OF
 	select DRM_MIPI_DSI
 	select VIDEOMODE_HELPERS
+	
+config DRM_PANEL_SAMSUNG_S6E3HA2
+	tristate "Samsung S6E3HA2 DSI video mode panel"
+	depends on OF
+	select DRM_MIPI_DSI
+	select VIDEOMODE_HELPERS
 
 config DRM_PANEL_SHARP_LQ101R1SX01
 	tristate "Sharp LQ101R1SX01 panel"
