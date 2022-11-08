@@ -423,7 +423,6 @@ static int rm6d010_probe(struct dsim_device *dsim)
 	ret = sysfs_create_link(&dsim->sec_dev->kobj, &lcd->ld->dev.kobj, "panel");
 	if (ret < 0) {
 		dev_err(lcd->dev, "%s: Failed to create panel symbolic link %d\n", __func__, ret);
-		goto err_create_dev_file;
 	}
 	ret = sysfs_create_link(&dsim->sec_dev->kobj, &lcd->bd->dev.kobj, "backlight");
 	if (ret < 0) {
